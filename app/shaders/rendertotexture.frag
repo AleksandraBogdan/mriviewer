@@ -5,6 +5,7 @@
 //precision mediump int;
 precision highp float;
 precision highp int;
+precision highp sampler3D;
 
 uniform float xDim;
 uniform float yDim;
@@ -16,9 +17,10 @@ uniform sampler2D texFF;
 uniform sampler2D texVolume;
 uniform sampler2D texVolumeMask;
 uniform sampler2D texVolumeAO;
-#else
+#endif
+#if useWebGL2 == 1
 uniform sampler3D texVolume;
-uniform sampler3D texVolumeMask;
+uniform sampler3D texVolumeMask;//currently 2D
 uniform sampler3D texVolumeAO;
 #endif
 uniform sampler2D texTF;
@@ -75,41 +77,6 @@ float tex3D(vec3 vecCur) {
   // get colors from neighbour slices
   float colorSlice1 = texture2D(texVolume, clamp(texCoordSlice1 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0).a;
   float colorSlice2 = texture2D(texVolume, clamp(texCoordSlice2 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0).a;
-  return mix(colorSlice1, colorSlice2, zRatio);
-}
-float tex3DvolAO(vec3 vecCur) {
-  float tCX = 1.0 / tileCountX;
-  vecCur = vecCur + vec3(0.5, 0.5, 0.5);
-  // check outside of texture volume
-  if ((vecCur.x < 0.0) || (vecCur.y < 0.0) || (vecCur.z < 0.0) || (vecCur.x > 1.0) ||  (vecCur.y > 1.0) || (vecCur.z > 1.0))
-    return 0.0;
-  float zSliceNumber1 = floor(vecCur.z  * (volumeSizeZ));
-    float zRatio = (vecCur.z * (volumeSizeZ)) - zSliceNumber1;
-  //zSliceNumber1 = min(zSliceNumber1, volumeSizeZ - 1.0);
-  // As we use trilinear we go the next Z slice.
-  float zSliceNumber2 = min( zSliceNumber1 + 1.0, (volumeSizeZ - 1.0)); //Clamp to 255
-  vec2 texCoord = vecCur.xy;
-  vec2 texCoordSlice1, texCoordSlice2;
-  texCoordSlice1 = texCoordSlice2 = texCoord;
-
-  // Add an offset to the original UV coordinates depending on the row and column number.
-  texCoordSlice1.x += (mod(zSliceNumber1, tileCountX - 0.0 ));
-  texCoordSlice1.y += floor(zSliceNumber1 / (tileCountX - 0.0) );
-  // ratio mix between slices
-  //float zRatio = mod(vecCur.z * (volumeSizeZ), 1.0);
-  texCoordSlice2.x += (mod(zSliceNumber2, tileCountX - 0.0 ));
-  texCoordSlice2.y += floor(zSliceNumber2 / (tileCountX - 0.0));
-
-  // add 0.5 correction to texture coordinates
-  float xSize = float(xDim);
-  float ySize = float(yDim);
-  vec2 vAdd = vec2(0.5 / xSize, 0.5 / ySize);
-  texCoordSlice1 += vAdd;
-  texCoordSlice2 += vAdd;
-
-  // get colors from neighbour slices
-  float colorSlice1 = texture2D(texVolumeAO, clamp(texCoordSlice1 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0).a;
-  float colorSlice2 = texture2D(texVolumeAO, clamp(texCoordSlice2 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0).a;
   return mix(colorSlice1, colorSlice2, zRatio);
 }
 
@@ -181,41 +148,6 @@ float tex3DAO(vec3 vecCur) {
   return colorSlice1;
 }
 */
-float tex3DMask(vec3 vecCur) {
-  float tCX = 1.0 / tileCountX;
-  vecCur = vecCur + vec3(0.5, 0.5, 0.5);
-  // check outside of texture volume
-  if ((vecCur.x < 0.0) || (vecCur.y < 0.0) || (vecCur.z < 0.0) || (vecCur.x > 1.0) ||  (vecCur.y > 1.0) || (vecCur.z > 1.0))
-    return 0.0;
-  float zSliceNumber1 = floor(vecCur.z  * (volumeSizeZ));
-    float zRatio = (vecCur.z * (volumeSizeZ)) - zSliceNumber1;
-  //zSliceNumber1 = min(zSliceNumber1, volumeSizeZ - 1.0);
-  // As we use trilinear we go the next Z slice.
-  float zSliceNumber2 = min( zSliceNumber1 + 1.0, (volumeSizeZ - 1.0)); //Clamp to 255
-  vec2 texCoord = vecCur.xy;
-  vec2 texCoordSlice1, texCoordSlice2;
-  texCoordSlice1 = texCoordSlice2 = texCoord;
-
-  // Add an offset to the original UV coordinates depending on the row and column number.
-  texCoordSlice1.x += (mod(zSliceNumber1, tileCountX - 0.0 ));
-  texCoordSlice1.y += floor(zSliceNumber1 / (tileCountX - 0.0) );
-  // ratio mix between slices
-  //float zRatio = mod(vecCur.z * (volumeSizeZ), 1.0);
-  texCoordSlice2.x += (mod(zSliceNumber2, tileCountX - 0.0 ));
-  texCoordSlice2.y += floor(zSliceNumber2 / (tileCountX - 0.0));
-
-  // add 0.5 correction to texture coordinates
-  float xSize = float(xDim);
-  float ySize = float(yDim);
-  vec2 vAdd = vec2(0.5 / xSize, 0.5 / ySize);
-  texCoordSlice1 += vAdd;
-  texCoordSlice2 += vAdd;
-
-  // get colors from neighbour slices
-  float colorSlice1 = texture2D(texVolumeMask, clamp(texCoordSlice1 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0).a;
-  float colorSlice2 = texture2D(texVolumeMask, clamp(texCoordSlice2 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0).a;
-  return mix(colorSlice1, colorSlice2, zRatio);
-}
 vec4 tex3DRoi(vec3 vecCur) {
   float tCX = 1.0 / tileCountX;
   vecCur = vecCur + vec3(0.5, 0.5, 0.5);
@@ -251,21 +183,93 @@ vec4 tex3DRoi(vec3 vecCur) {
   vec4 colorSlice2 = texture2D(texVolume, clamp(texCoordSlice2 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0);
   return mix(colorSlice1, colorSlice2, zRatio);
 }
+float tex3DMask(vec3 vecCur) {
+  float tCX = 1.0 / tileCountX;
+  vecCur = vecCur + vec3(0.5, 0.5, 0.5);
+  // check outside of texture volume
+  if ((vecCur.x < 0.0) || (vecCur.y < 0.0) || (vecCur.z < 0.0) || (vecCur.x > 1.0) ||  (vecCur.y > 1.0) || (vecCur.z > 1.0))
+    return 0.0;
+  float zSliceNumber1 = floor(vecCur.z  * (volumeSizeZ));
+    float zRatio = (vecCur.z * (volumeSizeZ)) - zSliceNumber1;
+  //zSliceNumber1 = min(zSliceNumber1, volumeSizeZ - 1.0);
+  // As we use trilinear we go the next Z slice.
+  float zSliceNumber2 = min( zSliceNumber1 + 1.0, (volumeSizeZ - 1.0)); //Clamp to 255
+  vec2 texCoord = vecCur.xy;
+  vec2 texCoordSlice1, texCoordSlice2;
+  texCoordSlice1 = texCoordSlice2 = texCoord;
+
+  // Add an offset to the original UV coordinates depending on the row and column number.
+  texCoordSlice1.x += (mod(zSliceNumber1, tileCountX - 0.0 ));
+  texCoordSlice1.y += floor(zSliceNumber1 / (tileCountX - 0.0) );
+  // ratio mix between slices
+  //float zRatio = mod(vecCur.z * (volumeSizeZ), 1.0);
+  texCoordSlice2.x += (mod(zSliceNumber2, tileCountX - 0.0 ));
+  texCoordSlice2.y += floor(zSliceNumber2 / (tileCountX - 0.0));
+
+  // add 0.5 correction to texture coordinates
+  float xSize = float(xDim);
+  float ySize = float(yDim);
+  vec2 vAdd = vec2(0.5 / xSize, 0.5 / ySize);
+  texCoordSlice1 += vAdd;
+  texCoordSlice2 += vAdd;
+
+  // get colors from neighbour slices
+  float colorSlice1 = texture2D(texVolumeMask, clamp(texCoordSlice1 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0).a;
+  float colorSlice2 = texture2D(texVolumeMask, clamp(texCoordSlice2 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0).a;
+  return mix(colorSlice1, colorSlice2, zRatio);
+}
+
+float tex3DvolAO(vec3 vecCur) {
+  float tCX = 1.0 / tileCountX;
+  vecCur = vecCur + vec3(0.5, 0.5, 0.5);
+  // check outside of texture volume
+  if ((vecCur.x < 0.0) || (vecCur.y < 0.0) || (vecCur.z < 0.0) || (vecCur.x > 1.0) ||  (vecCur.y > 1.0) || (vecCur.z > 1.0))
+    return 0.0;
+  float zSliceNumber1 = floor(vecCur.z  * (volumeSizeZ));
+    float zRatio = (vecCur.z * (volumeSizeZ)) - zSliceNumber1;
+  //zSliceNumber1 = min(zSliceNumber1, volumeSizeZ - 1.0);
+  // As we use trilinear we go the next Z slice.
+  float zSliceNumber2 = min( zSliceNumber1 + 1.0, (volumeSizeZ - 1.0)); //Clamp to 255
+  vec2 texCoord = vecCur.xy;
+  vec2 texCoordSlice1, texCoordSlice2;
+  texCoordSlice1 = texCoordSlice2 = texCoord;
+
+  // Add an offset to the original UV coordinates depending on the row and column number.
+  texCoordSlice1.x += (mod(zSliceNumber1, tileCountX - 0.0 ));
+  texCoordSlice1.y += floor(zSliceNumber1 / (tileCountX - 0.0) );
+  // ratio mix between slices
+  //float zRatio = mod(vecCur.z * (volumeSizeZ), 1.0);
+  texCoordSlice2.x += (mod(zSliceNumber2, tileCountX - 0.0 ));
+  texCoordSlice2.y += floor(zSliceNumber2 / (tileCountX - 0.0));
+
+  // add 0.5 correction to texture coordinates
+  float xSize = float(xDim);
+  float ySize = float(yDim);
+  vec2 vAdd = vec2(0.5 / xSize, 0.5 / ySize);
+  texCoordSlice1 += vAdd;
+  texCoordSlice2 += vAdd;
+
+  // get colors from neighbour slices
+  float colorSlice1 = texture2D(texVolumeAO, clamp(texCoordSlice1 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0).a;
+  float colorSlice2 = texture2D(texVolumeAO, clamp(texCoordSlice2 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0).a;
+  return mix(colorSlice1, colorSlice2, zRatio);
+}
+
 
 #else
 float tex3D(vec3 vecCur) {
-  vecCur = vecCur + vec3(0.5, 0.5, 0.5);
-  return texture(texVolume, vecCur).a;
+ vecCur = vecCur + vec3(0.5, 0.5, 0.5);
+ return texture(texVolume, vecCur).r;
 }
 
 float tex3DAO(vec3 vecCur) {
   vecCur = vecCur + vec3(0.5, 0.5, 0.5);
-  return texture(texVolume, vecCur).a;
+  return texture(texVolume, vecCur).r;
 }
 
 float tex3DvolAO(vec3 vecCur) {
   vecCur = vecCur + vec3(0.5, 0.5, 0.5);
-  return texture(texVolumeAO, vecCur).a;
+  return texture(texVolumeAO, vecCur).r;
 }
 
 vec4 tex3DRoi(vec3 vecCur) {
@@ -273,10 +277,12 @@ vec4 tex3DRoi(vec3 vecCur) {
   return texture(texVolume, vecCur);
 }
 
+
 float tex3DMask(vec3 vecCur) {
   vecCur = vecCur + vec3(0.5, 0.5, 0.5);
-  return texture(texVolumeMask, vecCur).a;
+  return texture(texVolumeMask, vecCur).r;
 }
+
 #endif
 
 vec3 CalcNormalRoi(vec3 iter)
@@ -409,8 +415,21 @@ vec3 CalcLighting(vec3 iter, vec3 dir)
   sumCol = mix(t_function2min.rgb, t_function2max.rgb, 1.-dif);
   float specular = pow(max(0.0, dot(normalize(reflect(lightDir, N)), dir)), SPEC_POV);
   // The resulting color depends on the longevity of the material in the surface of the isosurface
-//  return  (0.5*(brightness3D + 1.5)*(DIFFUSE * dif + AMBIENT) + SPEC * specular) * sumCol * tex3DvolAO(iter);
-  return  (0.5*(brightness3D + 1.5)*(DIFFUSE * dif + AMBIENT) + SPEC * specular) * sumCol;
+#if useAmbientTex == 1
+  float tAO = tex3DvolAO(iter);
+//  vec3 col = (0.5*(brightness3D + 1.5)*(DIFFUSE * dif * 0.5*(1.0 + tAO)  + AMBIENT * tAO) + SPEC * specular * tAO) * sumCol;
+  vec3 col = (0.5*(brightness3D + 1.5)*(DIFFUSE * dif + AMBIENT) + SPEC * specular) * sumCol * tAO;
+#else
+  vec3 col = (0.5*(brightness3D + 1.5)*(DIFFUSE * dif + AMBIENT) + SPEC * specular) * sumCol;
+#endif
+  
+//  float t = 0.05*max(0.0, dot(dir, normalize(iter))+1.0);
+  
+  float t = 0.1*max(0.0, dot(dir, normalize(iter)));
+  col = (1.0 - t)*col + t*vec3(0.0, 0.0, 1.0);
+  //col = tex3DvolAO(iter) * vec3(1.0);
+  return col;
+  //return  (0.5*(brightness3D + 1.5)*(DIFFUSE * dif + AMBIENT) + SPEC * specular) * sumCol;
 }
 
 vec3 CalcLightingAO(vec3 iter, vec3 dir, float isoThreshold)
@@ -863,12 +882,20 @@ void main() {
   vec4 backTexel = texture2D(texBF, tc, 0.0);
   vec3 back = backTexel.xyz;
   vec4 start = texture2D(texFF, tc, 0.0);
-  if (backTexel.a < 0.5)
+
+
+  if (backTexel.a < 0.5 || start.a < 0.5)
   {
-    gl_FragColor = acc;
+    gl_FragColor = vec4(0, 0, 0, 2.0);//acc;
     return;
   }
   vec3 dir = normalize(back - start.xyz);
+
+  if (length (back - start.xyz) < 0.03) {
+    gl_FragColor = vec4(0, 0, 0, 2.0);
+    return;
+  }
+
 //  const float ISO_VOLUME_STEP_SIZE = 0.0035;
   //Direct volume render
 

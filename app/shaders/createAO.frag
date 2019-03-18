@@ -1,7 +1,14 @@
 /**
 * Pixel shader for filtering source dates and nolmals calculation
 */
+#if useWebGL2 == 0
 uniform sampler2D texVolume;
+#endif
+#if useWebGL2 == 1
+precision highp sampler3D;
+uniform sampler3D texVolume;
+#endif
+const int nVec = 1000;
 uniform sampler2D vectorsTex;
 varying vec2 texCoord;
 uniform vec3 texelSize;
@@ -10,11 +17,14 @@ uniform float tileCountX;
 uniform float volumeSizeZ;
 uniform float xDim;
 uniform float yDim;
+uniform float curZ;
+uniform float isoThreshold;
+uniform int vectorsSize;
 
 /**
 * Reading from 3D texture
 */
-
+#if useWebGL2 == 0
 float tex3D(vec3 vecCur) {
   float tCX = 1.0 / tileCountX;
   vecCur = vecCur + vec3(0.5, 0.5, 0.5);
@@ -34,7 +44,7 @@ float tex3D(vec3 vecCur) {
   texCoordSlice1.x += (mod(zSliceNumber1, tileCountX - 0.0 ));
   texCoordSlice1.y += floor(zSliceNumber1 / (tileCountX - 0.0) );
   // ratio mix between slices
-  
+
   texCoordSlice2.x += (mod(zSliceNumber2, tileCountX - 0.0 ));
   texCoordSlice2.y += floor(zSliceNumber2 / (tileCountX - 0.0));
 
@@ -48,7 +58,27 @@ float tex3D(vec3 vecCur) {
   float colorSlice2 = texture2D(texVolume, clamp(texCoordSlice2 * tCX, vec2(0.0, 0.0), vec2(1.0, 1.0)), 0.0).a;
   return mix(colorSlice1, colorSlice2, zRatio);
 }
-
+#else
+float tex3D(vec3 vecCur) {
+  float xSize = float(xDim);
+  float ySize = float(yDim);
+  float zSize = float(volumeSizeZ);
+  vec3 vAdd = vec3(0.5 / xSize, 0.5 / ySize, 0.5 / zSize);
+  vecCur = vecCur + vec3(0.5, 0.5, 0.5);
+  if ((vecCur.x < 0.0) || (vecCur.y < 0.0) || (vecCur.z < 0.0) || (vecCur.x > 1.0) ||  (vecCur.y > 1.0) || (vecCur.z > 1.0))
+    return 0.0;
+  /*if (all(lessThan(vecCur.xy, vec2(0.001))) ||
+      all(lessThan(vecCur.xz, vec2(0.001))) || 
+	  all(lessThan(vecCur.zy, vec2(0.001))) )
+	return 0.0;
+  if (all(greaterThan(vecCur.xy, vec2(0.999))) ||
+      all(greaterThan(vecCur.xz, vec2(0.999))) || 
+	  all(greaterThan(vecCur.zy, vec2(0.999))) )
+	return 0.0;*/
+//  return texture(texVolume, vecCur + vAdd).r;
+  return texture(texVolume, vecCur).r;
+}
+#endif
 /**
 * Calculate 3D texture coordinates
 */
@@ -66,45 +96,66 @@ vec3 getTex3DCoord(vec2 base) {
 
   return res - vec3(0.5, 0.5, 0.5);
 }
-/*
 
-float filterBlur(vec3 base)
-{
-  float acc = 0.0;
-  float sigma = blurSigma;//0.965;
-  float sigma2 = sigma*sigma;
-  float sigmaD = blurSigma;//0.965;
-  float sigmaD2 = sigmaD*sigmaD;
-  float sigmaB = blurSigma;//0.9515;
-  float sigmaB2 = sigmaB*sigmaB;
-  float val = tex3D(base);
-  float norm_factor = 0.0;
-  float norm_factorB = 0.0;
-
-  bool skip = false;
-  if(skip == false)
-  {
-    for (float i = -2.0; i < 2.5; i += 1.0)
-      for (float j = -2.0; j < 2.5; j += 1.0)
-        for (float k = -2.0; k < 2.5; k += 1.0)
-        {
-          float curVal = tex3D(base + vec3(texelSize.x * i, texelSize.y * j, texelSize.z * k));
-//          float gaussB = exp( -(i*i + j*j + k*k) / (2.0 * sigma2));// - (val - curVal)*(val - curVal) / (2.0 * sigmaB2) );
-          float gaussW = exp( -(i*i + j*j + k*k) / (2.0 * sigmaD2) ); // (2.0 * 3.1415 * sigmaD2);
-          acc += curVal * gaussW;
-          norm_factorB += gaussW;
-        }
-   }
-  // intencity
-  acc = acc / norm_factorB;
-  return acc;
-}
+/**
+* Calculation of normal
 */
+vec3 CalcNormal(vec3 iter)
+{
+  vec3 dx = vec3(texelSize.x, 0.0, 0.0), dy = vec3(0.0, texelSize.x, 0.0), dz = vec3(0.0, 0.0, texelSize.x), N;
+  // Culculate normal
+  N.x = tex3D(iter + dx) - tex3D(iter - dx);
+  N.y = tex3D(iter + dy) - tex3D(iter - dy);
+  N.z = tex3D(iter + dz) - tex3D(iter - dz);
+  return N;
+}
+
+float ao(vec3 base){
+  const float TWICE = 2.0;
+  float STEPSIZE = texelSize.z;
+  const int STEPCOUNT = 16;
+  float res = 1.0;
+  float fVectorsSize = float(vectorsSize);
+  float reverseVectorSize = 1.0 / fVectorsSize;
+  vec3 normal = -CalcNormal(base);
+  if (length(normal) < 1.0/256.0 || tex3D(base) < 0.75 * isoThreshold)
+    return 1.0;
+  normal = normalize(normal);
+  vec3 currentVox;
+  float tempBase = isoThreshold; //tex3D(base);
+//  float tempBase = tex3D(base);
+  float t = 0.0;
+  for(int i = 0; i < vectorsSize; i++){ //the ray selection
+      vec3 currentVectorTex = texture2D(vectorsTex, vec2(t, 0.0), 0.0).rgb;
+	  t += reverseVectorSize;
+      currentVectorTex -= vec3(0.5);
+      normalize(currentVectorTex);
+      if(dot(normal, currentVectorTex) > 0.0){ //we walk along the ray
+	    currentVox = base + STEPSIZE * normal;//currentVectorTex; 
+        for(int step = 0; step < STEPCOUNT; step++){
+            currentVox += 2.0*STEPSIZE * currentVectorTex;
+            if((tex3D(currentVox) > tempBase)){
+			     res = res - TWICE * reverseVectorSize;
+                 break;
+            }
+        }
+      }
+  }
+  return max(0.0, res);
+}
+
+
 void main() {
-  vec3 base = getTex3DCoord(texCoord);
+  //vec3 base = getTex3DCoord(texCoord);
+  vec3 base;
+  base.xy = texCoord;
+  base.z = curZ;
+  base = base - vec3(0.5, 0.5, 0.5);
   vec4 acc = vec4(0.0, 0.0, 0.0, 1.0);
-  float val = 1.0;//filterBlur(base);
+  float val = 0.99;
+  val = ao(base);
   acc = vec4(val, val, val, 1);
-  
+
   gl_FragColor = acc;
 }
+

@@ -159,8 +159,42 @@ function onPageLoad() {
   curFileDataType = slider3dInitVal.undefined;
   menu = new Menu();
 
-  const fileNameOnLoad = config.data.onloadsrc;
+  // loaded file from static app config
+  let fileNameOnLoad = config.data.onloadsrc;
+
+  // read paraameters from url
+  // for dicom folder like:
+  // ?url=http://www.someplace.com/folder
+  //
+  const strSearch = window.location.search;
+  if (strSearch.length > 0) {
+    // console.log(`onPageLoad. app search = ${strSearch}`);
+    const strReg = /\\?url=(\S+)/;
+    const arr = strSearch.match(strReg);
+    if (arr === null) {
+      console.log('arguments should be in form: ?url=www.xxx.yy/zz/ww');
+      return;
+    }
+    fileNameOnLoad = arr[1];
+    // console.log(`fileNameOnLoad = ${fileNameOnLoad}`);
+
+    // check url valid
+    // use both forms to chekc urls:
+    // www.XXX.YYY/....
+    // DDD.DDD.DDD.DDD:ddd/....
+    //
+    const regA = /^((ftp|http|https):\/\/)?(([\S]+)\.)?([\S]+)\.([A-z]{2,})(:\d{1,6})?\/[\S]+/;
+    const regB = /(ftp|http|https):\/\/([\d]+)\.([\d]+)\.([\d]+)\.([\d]+)(:([\d]+))?\/([\S]+)/;
+    const isValidA = fileNameOnLoad.match(regA);
+    const isValidB = fileNameOnLoad.match(regB);
+    if ((isValidA === null) && (isValidB === null)) {
+      console.log(`Not valid URL = ${fileNameOnLoad}`);
+      return;
+    }
+  }
+  // detect file type by file name extenstion
   const fileTypeOnLoad = _getLoadFileType(fileNameOnLoad);
+
   const opts = {
     container3d: root3dContainer,
     container2d: root2dContainer,
