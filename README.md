@@ -1,8 +1,8 @@
-# Med3Web Dicom 2d/3d web viewer.
+# MRI Viewer: Medical image 2D/3D web viewer.
 
 Copyright (c) 2015–2018 [EPAM Systems, Inc.](https://www.epam.com/)
 
-Med3Web is a high performance web tool for advanced visualization (both in 2d and 3d modes)
+MRI Viewer is a high performance web tool for advanced visualization (both in 2d and 3d modes)
 medical volumetric data, provided in popular file formats: Dicom, Nifti, Ktx, Hdr.
 Other popular formats will be planned for future improvements.
 Med3Web can read local data from files/folders and from predefined web locations.
@@ -15,7 +15,7 @@ with mobile browsers (Android Chrome).
 
 ## Market evaluation
 
-Med3Web can be used in a medical center with diagnostic equipment.
+MRI Viewer can be used in a medical center with diagnostic equipment.
 MRI and CT scanning results can be viewed in any computer (inside the medical office and in the client home)
 and qualified medical personnel can provide diagnosis or conclusion based on provided visualization.
 Unlike the range of standalone Dicom viewers executables, this app can be used as a web
